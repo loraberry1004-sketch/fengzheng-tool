@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>风正风电场变形计算器</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#2F5496;--blue-dark:#244080;--blue-light:#eef3fc;
+  --green:#1a5c38;--green-light:#eef6f1;--green-border:#7bcca0;
+  --yellow-light:#fffbee;--yellow-border:#ffe082;
+  --teal-light:#d1ecf1;--teal:#0c5460;
+  --red:#a02020;--gray:#f0efe9;--border:#dedad2;--text:#1a1a1a;--sub:#888;
+}
+body{font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:var(--gray);color:var(--text);min-height:100vh}
+
+/* Header */
+.header{background:var(--blue);color:#fff;padding:1.1rem 2rem;display:flex;align-items:center;justify-content:space-between}
+.header-left h1{font-size:17px;font-weight:500}
+.header-left p{font-size:12px;opacity:.7;margin-top:3px}
+.header-badge{background:rgba(255,255,255,.15);border-radius:6px;padding:4px 12px;font-size:12px}
+
+/* Layout */
+.main{max-width:1080px;margin:0 auto;padding:1.25rem 1rem 3rem}
+
+/* Cards */
+.card{background:#fff;border:.5px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin-bottom:1rem}
+.card-title{font-size:11px;font-weight:500;color:var(--sub);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.85rem;display:flex;align-items:center;gap:.4rem}
+.card-title::before{content:'';display:inline-block;width:3px;height:12px;background:var(--blue);border-radius:2px}
+
+/* Steps */
+.steps{display:flex;gap:.5rem;margin-bottom:1.25rem}
+.step-pill{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;background:#fff;border:.5px solid var(--border);color:var(--sub);cursor:default}
+.step-pill.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.step-pill.done{background:var(--green-light);color:var(--green);border-color:var(--green-border)}
+
+/* Upload */
+.drop{border:1.5px dashed #ccc;border-radius:8px;padding:2rem;text-align:center;cursor:pointer;background:#fafaf8;transition:.15s}
+.drop:hover,.drop.over{border-color:var(--blue);background:var(--blue-light)}
+.drop input{display:none}
+.drop-icon{font-size:28px;margin-bottom:.35rem}
+.drop-txt{font-size:14px;color:#555}
+.drop-hint{font-size:12px;color:#aaa;margin-top:.2rem}
+.file-ok{background:var(--green-light);border:.5px solid var(--green-border);border-radius:8px;padding:.7rem 1rem;font-size:13px;color:var(--green);margin-top:.6rem;display:flex;align-items:center;gap:.5rem}
+
+/* Inputs */
+.grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.75rem;margin-bottom:.5rem}
+label{font-size:12px;color:#777;display:block;margin-bottom:3px}
+input[type=number]{width:100%;padding:7px 10px;border:.5px solid #ccc;border-radius:6px;font-size:13px;background:#fafaf8;color:var(--text)}
+input:focus{outline:none;border-color:var(--blue)}
+.hint-text{font-size:11px;color:#aaa;margin-top:.35rem}
+
+/* Button */
+.btn{width:100%;padding:11px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;transition:.15s}
+.btn:hover:not(:disabled){background:var(--blue-dark)}
+.btn:disabled{background:#b0b8c8;cursor:not-allowed}
+.btn-green{background:var(--green)}.btn-green:hover:not(:disabled){background:#144d2e}
+
+/* Tags */
+.tag{display:inline-block;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600;letter-spacing:.02em}
+.tag-manual{background:#fff3cd;color:#856404}
+.tag-calc{background:var(--teal-light);color:var(--teal)}
+.tag-sum{background:#d4edda;color:#155724}
+.tag-direct{background:#f0ede6;color:#666}
+
+/* Section headers */
+.sec-header{font-size:12px;font-weight:600;color:var(--blue);background:var(--blue-light);padding:5px 12px;border-radius:5px;margin:1rem 0 .4rem;display:flex;align-items:center;gap:.4rem}
+
+/* Table */
+.table-wrap{overflow-x:auto;border:.5px solid var(--border);border-radius:8px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:var(--blue);color:#fff;padding:7px 10px;text-align:left;font-weight:500;font-size:11px;white-space:nowrap}
+td{padding:6px 10px;border-bottom:.5px solid #f0ede6;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr.sum-row td{background:#f4f8ff;font-weight:500}
+tr.manual-row td{background:var(--yellow-light)}
+tr.calc-row td{background:#f0fafe}
+tr:hover td{filter:brightness(.97)}
+.col-row{width:42px;color:var(--sub);font-size:11px;font-family:monospace}
+.col-name{width:220px}
+.col-logic{width:55px;text-align:center}
+.col-src{color:#666;font-size:11px}
+.col-val{text-align:right;font-family:monospace;font-size:12px;width:105px;white-space:nowrap}
+.col-unit{width:60px;color:var(--sub);text-align:center;font-size:11px}
+.pos{color:var(--green)}
+.neg{color:var(--red)}
+
+/* Summary boxes */
+.summary-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.75rem;margin-top:1rem}
+.summary-box{background:#fafaf8;border:.5px solid var(--border);border-radius:8px;padding:.9rem 1rem}
+.summary-box.highlight{background:var(--blue);color:#fff;border-color:var(--blue)}
+.summary-box.highlight .s-label{color:rgba(255,255,255,.7)}
+.summary-box.highlight .s-val{color:#fff}
+.s-label{font-size:11px;color:var(--sub);margin-bottom:.25rem}
+.s-val{font-size:18px;font-weight:600;color:var(--blue)}
+.s-sub{font-size:11px;color:var(--sub);margin-top:.15rem}
+
+/* Legend */
+.legend{display:flex;gap:1rem;font-size:11px;color:#666;flex-wrap:wrap;margin:.6rem 0}
+.legend-item{display:flex;align-items:center;gap:.3rem}
+
+@media(max-width:700px){
+  .grid4{grid-template-columns:1fr 1fr}
+  .summary-grid{grid-template-columns:1fr 1fr}
+  .col-src{display:none}
+  .header{flex-direction:column;align-items:flex-start;gap:.4rem}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>⚡ 风正风电场变形计算器</h1>
+    <p>上传结算单 Excel · 填入手动值 · 查看逐行计算逻辑 · 下载复盘 Excel</p>
+  </div>
+  <div class="header-badge">河北南网 · HEPX</div>
+</div>
+
+<div class="main">
+
+<div class="steps" id="steps">
+  <div class="step-pill active" id="s1">① 上传 Excel</div>
+  <div class="step-pill" id="s2">② 填入手动值</div>
+  <div class="step-pill" id="s3">③ 查看计算结果</div>
+</div>
+
+<!-- Step 1 -->
+<div class="card" id="card1">
+  <div class="card-title">上传结算单 Excel</div>
+  <div class="drop" id="drop" onclick="document.getElementById('fi').click()">
+    <div class="drop-icon">📊</div>
+    <div class="drop-txt">点击或拖拽结算单 Excel 至此处</div>
+    <div class="drop-hint">由对话生成的「风正风电场YYYYMM月结算单.xlsx」（电价已转换为元/千瓦时，电费已转换为千元）</div>
+    <input type="file" id="fi" accept=".xlsx,.xls">
+  </div>
+  <div id="fileStatus"></div>
+</div>
+
+<!-- Step 2 -->
+<div class="card" id="card2">
+  <div class="card-title">填入手动输入值</div>
+  <div class="grid4">
+    <div>
+      <label>机制电量 CfD Volume (MWh)</label>
+      <input type="number" id="cfdVol" placeholder="如：9215.005" step="0.001">
+    </div>
+    <div>
+      <label>场站实时体质电价 Spot Price (元/kWh)</label>
+      <input type="number" id="spotPrice" placeholder="如：0.34204" step="0.000001">
+    </div>
+    <div>
+      <label>市场同类实时均价 Market Avg (元/kWh)</label>
+      <input type="number" id="mktSpot" placeholder="如：0.340033" step="0.000001">
+    </div>
+    <div>
+      <label>CfD 手动调整值（千元）</label>
+      <input type="number" id="cfdAdj" placeholder="如：224.54203" step="0.00001">
+    </div>
+  </div>
+  <p class="hint-text">* CfD Settlement（行50）= 手动调整值 + Spot Price × CfD Volume</p>
+  <p class="hint-text">* 行9 Power Trade = 行22（01总量）− 行8（CfD Volume）</p>
+  <p class="hint-text">* 行21 省内现货（变形）= 010202结算电量 − CfD Volume　　行63 = 010202结算电费 − Spot Price × CfD Volume</p>
+</div>
+
+<!-- Step 3 -->
+<div class="card">
+  <div class="card-title">计算并查看逻辑</div>
+  <button class="btn" id="calcBtn" onclick="calculate()" disabled>开始计算</button>
+  <div id="calcResult"></div>
+</div>
+
+</div>
+
+<script>
+let excelData = null;
+
+// ---- Drop & File ----
+const drop = document.getElementById('drop');
+drop.addEventListener('dragover', e=>{e.preventDefault();drop.classList.add('over')});
+drop.addEventListener('dragleave', ()=>drop.classList.remove('over'));
+drop.addEventListener('drop', e=>{e.preventDefault();drop.classList.remove('over');loadFile(e.dataTransfer.files[0])});
+document.getElementById('fi').addEventListener('change', e=>loadFile(e.target.files[0]));
+
+function setStep(n){
+  [1,2,3].forEach(i=>{
+    const el=document.getElementById('s'+i);
+    el.className='step-pill'+(i<n?' done':i===n?' active':'');
+  });
+}
+
+function loadFile(f){
+  if(!f) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+      excelData=parseSettlement(data);
+      const period=excelData.period||'';
+      document.getElementById('fileStatus').innerHTML=
+        `<div class="file-ok">✅ 已加载：${f.name}　|　期间：${period?period.slice(0,4)+'年'+period.slice(4,6)+'月':''}　|　01结算电量：${(excelData['01_qty']||0).toFixed(3)} MWh</div>`;
+      document.getElementById('calcBtn').disabled=false;
+      setStep(2);
+    }catch(err){
+      document.getElementById('fileStatus').innerHTML=
+        `<div style="color:#a02020;font-size:13px;margin-top:.5rem">❌ 读取失败：${err.message}</div>`;
+    }
+  };
+  reader.readAsArrayBuffer(f);
+}
+
+function pn(v){
+  if(v===null||v===undefined||v==='-'||v==='') return 0;
+  const n=parseFloat(String(v).replace(/,/g,''));
+  return isNaN(n)?0:n;
+}
+
+function parseSettlement(rows){
+  const d={};
+  // 找年月
+  for(const r of rows){
+    if(!r) continue;
+    for(const cell of r){
+      if(cell&&String(cell).match(/(\d{4})年(\d{2})月/)){
+        const m=String(cell).match(/(\d{4})年(\d{2})月/);
+        if(m) d.period=m[1]+m[2];
+      }
+    }
+  }
+  // 找结算科目数据：A列是科目编码
+  for(const r of rows){
+    if(!r||!r[0]) continue;
+    const code=String(r[0]).trim();
+    if(!/^\d{2,10}$/.test(code)) continue;
+    d[code]={plan:pn(r[2]),qty:pn(r[3]),fee:pn(r[5])};
+  }
+  // 快捷字段
+  const g=(c,f)=>d[c]?.[f]??0;
+  d['01_qty']       =g('01','qty');
+  d['010201_qty']   =g('010201','qty'); d['010201_fee']=g('010201','fee');
+  d['010202_qty']   =g('010202','qty'); d['010202_fee']=g('010202','fee');
+  d['01010202_qty'] =g('01010202','qty'); d['01010202_fee']=g('01010202','fee');
+  d['01010201_qty'] =g('01010201','qty')||g('01010201','plan'); d['01010201_fee']=g('01010201','fee');
+  d['01010203_qty'] =g('01010203','qty')||g('01010203','plan'); d['01010203_fee']=g('01010203','fee');
+  d['01010402_qty'] =g('01010402','qty')||g('01010402','plan'); d['01010402_fee']=g('01010402','fee');
+  d['01010403_qty'] =g('01010403','qty')||g('01010403','plan'); d['01010403_fee']=g('01010403','fee');
+  d['010105_qty']   =g('010105','qty')||g('010105','plan'); d['010105_fee']=g('010105','fee');
+  d['020102_fee']   =g('020102','fee');
+  d['020103_qty']   =g('020103','qty'); d['020103_fee']=g('020103','fee');
+  d['03_fee']       =g('03','fee');
+  d['0202_fee']     =g('0202','fee');
+  d['0103_fee']     =g('0103','fee');
+  d['0206_fee']     =g('0206','fee');
+  return d;
+}
+
+// ---- Calculate ----
+function calculate(){
+  const cfdVol   =parseFloat(document.getElementById('cfdVol').value);
+  const spotPrice=parseFloat(document.getElementById('spotPrice').value);
+  const mktSpot  =parseFloat(document.getElementById('mktSpot').value);
+  const cfdAdj   =parseFloat(document.getElementById('cfdAdj').value);
+  if(!excelData){alert('请先上传 Excel 文件');return}
+  if([cfdVol,spotPrice,mktSpot,cfdAdj].some(isNaN)){alert('请填写所有手动输入值');return}
+  const d=excelData;
+
+  // ----电量----
+  const r8  ={val:cfdVol,                                                     src:'手动输入',                                                    type:'manual'};
+  const r22 ={val:d['01_qty'],                                                 src:'01-结算电量/容量（直接读取）',                                   type:'direct'};
+  const r9  ={val:d['01_qty']-cfdVol,                                          src:'行22（01总量）− 行8（CfD Volume）',                            type:'calc'};
+  const r12 ={val:d['01010402_qty'],                                           src:'01010402-结算电量（省间绿电电能量）',                             type:'direct'};
+  const r13 ={val:d['01010202_qty'],                                           src:'01010202-结算电量（省内绿电电能量）',                             type:'direct'};
+  const r14 ={val:d['020103_qty'],                                             src:'020103-结算电量（省内绿电环境权益）',                             type:'direct'};
+  const r11 ={val:d['01010402_qty']+d['01010202_qty'],                         src:'行12（省间绿电）+ 行13（省内绿电）',                             type:'sum'};
+  const r16 ={val:d['01010403_qty'],                                           src:'01010403-结算电量（其他省间交易→省间普通中长期）',                 type:'direct'};
+  const r17 ={val:d['01010201_qty']+d['01010203_qty']+d['010105_qty'],         src:'01010201 + 01010203 + 010105 结算电量',                        type:'direct'};
+  const r18 ={val:0,                                                           src:'无（填0）',                                                   type:'direct'};
+  const r15 ={val:r16.val+r17.val+r18.val,                                    src:'行16（省间）+ 行17（省内）+ 行18（偏差）',                        type:'sum'};
+  const r20 ={val:d['010201_qty'],                                             src:'010201-结算电量（省间现货）',                                    type:'direct'};
+  const r21 ={val:d['010202_qty']-cfdVol,                                      src:`010202结算电量(${d['010202_qty'].toFixed(3)}) − CfD Vol(${cfdVol})`, type:'calc'};
+  const r19 ={val:r20.val+r21.val,                                             src:'行20（省间现货）+ 行21（省内现货变形）',                           type:'sum'};
+  const r10 ={val:r11.val+r15.val+r18.val,                                    src:'行11（绿电）+ 行15（普通中长期）+ 行18（偏差）',                   type:'sum'};
+
+  // ----电价----
+  const r28 ={val:0.3644,                                                      src:'固定值',                                                      type:'direct'};
+  const r50e={val:cfdAdj+spotPrice*cfdVol,                                    src:'',type:'calc'}; // 先算r50
+  const r27 ={val:cfdVol!==0?(cfdAdj+spotPrice*cfdVol)/cfdVol:0,              src:'CfD Settlement ÷ CfD Volume',                                 type:'calc'};
+  const r29 ={val:mktSpot,                                                     src:'手动输入',                                                    type:'manual'};
+  const r30 ={val:spotPrice,                                                   src:'手动输入',                                                    type:'manual'};
+
+  // ----电费----
+  const r50 ={val:cfdAdj+spotPrice*cfdVol,                                    src:`手动调整值(${cfdAdj}) + Spot Price(${spotPrice}) × CfD Vol(${cfdVol})`, type:'calc'};
+  const r54 ={val:d['01010402_fee'],                                           src:'01010402-结算电费（千元）',                                     type:'direct'};
+  const r55 ={val:d['01010202_fee'],                                           src:'01010202-结算电费（千元）',                                     type:'direct'};
+  const r56 ={val:d['020102_fee']+d['020103_fee'],                             src:'020102 + 020103 结算电费（千元）',                              type:'direct'};
+  const r53 ={val:r54.val+r55.val+r56.val,                                    src:'行54 + 行55 + 行56',                                           type:'sum'};
+  const r58 ={val:d['01010403_fee'],                                           src:'01010403-结算电费（千元）（其他省间交易→省间普通中长期）',          type:'direct'};
+  const r59 ={val:d['01010201_fee']+d['01010203_fee']+d['010105_fee'],         src:'01010201 + 01010203 + 010105 结算电费（千元）',                type:'direct'};
+  const r60 ={val:0,                                                           src:'无（填0）',                                                   type:'direct'};
+  const r57 ={val:r58.val+r59.val+r60.val,                                    src:'行58 + 行59 + 行60',                                           type:'sum'};
+  const r52 ={val:r53.val+r57.val+r60.val,                                    src:'行53（绿电）+ 行57（普通中长期）+ 行60（偏差）',                  type:'sum'};
+  const r62 ={val:d['010201_fee'],                                             src:'010201-结算电费（千元）',                                       type:'direct'};
+  const r63 ={val:d['010202_fee']-spotPrice*cfdVol,                            src:`010202结算电费(${d['010202_fee'].toFixed(3)}) − Spot Price × CfD Vol`, type:'calc'};
+  const r61 ={val:r62.val+r63.val,                                             src:'行62（省间现货）+ 行63（省内现货变形）',                           type:'sum'};
+  const r51 ={val:r52.val+r61.val,                                             src:'行52（中长期）+ 行61（现货）',                                  type:'sum'};
+  const r65 ={val:d['03_fee'],                                                 src:'03-结算电费（千元）',                                           type:'direct'};
+  const r66 ={val:d['0202_fee'],                                               src:'0202-结算电费（千元）',                                         type:'direct'};
+  const r67 ={val:d['0206_fee']+d['0103_fee'],                                 src:'0206 + 0103 结算电费（千元）',                                  type:'direct'};
+  const r64 ={val:r65.val+r66.val+r67.val,                                    src:'行65 + 行66 + 行67',                                           type:'sum'};
+  const r69 ={val:r50.val+r51.val,                                             src:'CfD Settlement（行50）+ Power Trade（行51）',                  type:'sum'};
+  const r70 ={val:r50.val+r51.val+r64.val,                                    src:'CfD Settlement + Power Trade + Trading Fee',                   type:'sum'};
+  const r74 ={val:r22.val!==0?r69.val/r22.val:0,                              src:'扣费前总收入（行69）÷ Total Generation（行22）',                 type:'calc'};
+  const r75 ={val:r22.val!==0?r70.val/r22.val:0,                              src:'总收入（行70）÷ Total Generation（行22）',                      type:'calc'};
+
+  const V={r8,r9,r10,r11,r12,r13,r14,r15,r16,r17,r18,r19,r20,r21,r22,
+           r27,r28,r29,r30,r50,r51,r52,r53,r54,r55,r56,r57,r58,r59,r60,r61,r62,r63,r64,r65,r66,r67,r69,r70,r74,r75};
+
+  renderResult(V, excelData.period, cfdVol, spotPrice, mktSpot, cfdAdj);
+  setStep(3);
+}
+
+function fmt(v, dec=3){
+  if(v===null||v===undefined) return '—';
+  const n=parseFloat(v);
+  if(isNaN(n)) return '—';
+  const s=Math.abs(n).toLocaleString('zh-CN',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+  const cls=n<0?'neg':n>0?'pos':'';
+  return `<span class="${cls}">${n<0?'−':''}${s}</span>`;
+}
+
+function tagHTML(t){
+  const map={manual:'<span class="tag tag-manual">手动</span>',calc:'<span class="tag tag-calc">变形</span>',sum:'<span class="tag tag-sum">汇总</span>',direct:'<span class="tag tag-direct">读取</span>'};
+  return map[t]||'';
+}
+
+function tr(rowNum, name, V, unit, dec){
+  const item=V['r'+rowNum];
+  if(!item) return '';
+  const d=dec||(unit==='元/kWh'?6:3);
+  const cls=item.type==='sum'?' class="sum-row"':item.type==='manual'?' class="manual-row"':item.type==='calc'?' class="calc-row"':'';
+  return `<tr${cls}>
+    <td class="col-row">行${rowNum}</td>
+    <td class="col-name">${name}</td>
+    <td class="col-logic">${tagHTML(item.type)}</td>
+    <td class="col-src">${item.src}</td>
+    <td class="col-val">${fmt(item.val,d)}</td>
+    <td class="col-unit">${unit}</td>
+  </tr>`;
+}
+
+function thead(){
+  return `<tr><th class="col-row">行号</th><th class="col-name">科目</th><th class="col-logic">类型</th><th class="col-src">数据来源 / 计算逻辑</th><th class="col-val">数值</th><th class="col-unit">单位</th></tr>`;
+}
+
+function renderResult(V, period, cfdVol, spotPrice, mktSpot, cfdAdj){
+  const el=document.getElementById('calcResult');
+  el.innerHTML=`
+  <div class="legend">
+    <span class="legend-item">${tagHTML('manual')} 手动输入值</span>
+    <span class="legend-item">${tagHTML('direct')} 直接读取自Excel</span>
+    <span class="legend-item">${tagHTML('calc')} 经过变形计算</span>
+    <span class="legend-item">${tagHTML('sum')} 子行求和汇总</span>
+  </div>
+
+  <div class="sec-header">⚡ 电量部分（MWh）</div>
+  <div class="table-wrap"><table>${thead()}
+    ${tr(8,  'CfD Volume 机制电量', V, 'MWh')}
+    ${tr(22, 'Total Generation 总发电量', V, 'MWh')}
+    ${tr(9,  'Power Trade 市场化交易 ⟵变形', V, 'MWh')}
+    ${tr(10, '　Mid-Long Term 中长期交易', V, 'MWh')}
+    ${tr(11, '　　Green Power 绿电交易', V, 'MWh')}
+    ${tr(12, '　　　省间绿电（01010402）', V, 'MWh')}
+    ${tr(13, '　　　省内绿电（01010202）', V, 'MWh')}
+    ${tr(14, '　　Green Power EA 绿电环境溢价', V, 'MWh')}
+    ${tr(15, '　　Brown Power 普通中长期', V, 'MWh')}
+    ${tr(16, '　　　省间普通中长期（01010403）', V, 'MWh')}
+    ${tr(17, '　　　省内普通中长期（01010201+203+105）', V, 'MWh')}
+    ${tr(18, '　　Imbalance 偏差考核', V, 'MWh')}
+    ${tr(19, '　Spot Trade 现货交易', V, 'MWh')}
+    ${tr(20, '　　省间现货（010201）', V, 'MWh')}
+    ${tr(21, '　　省内现货 ⟵变形（010202 − CfD Vol）', V, 'MWh')}
+  </table></div>
+
+  <div class="sec-header">💰 电价部分（元/kWh）</div>
+  <div class="table-wrap"><table>${thead()}
+    ${tr(28, 'CfD Price 机制电价（固定）', V, '元/kWh')}
+    ${tr(27, 'CfD Price Difference（Settlement ÷ CfD Vol）', V, '元/kWh')}
+    ${tr(29, 'Market Average Spot Price 市场同类实时均价', V, '元/kWh')}
+    ${tr(30, 'Spot Price 场站实时体质电价', V, '元/kWh')}
+  </table></div>
+
+  <div class="sec-header">📊 电费部分（千元）</div>
+  <div class="table-wrap"><table>${thead()}
+    ${tr(50, 'CfD Settlement 机制结算 ⟵变形', V, '千元')}
+    ${tr(51, 'Power Trade 市场化交易', V, '千元')}
+    ${tr(52, '　Mid-Long Term 中长期交易', V, '千元')}
+    ${tr(53, '　　Green Power 绿电交易', V, '千元')}
+    ${tr(54, '　　　省间绿电（01010402）', V, '千元')}
+    ${tr(55, '　　　省内绿电（01010202）', V, '千元')}
+    ${tr(56, '　　　Green Power EA（020102+020103）', V, '千元')}
+    ${tr(57, '　　Brown Power 普通中长期', V, '千元')}
+    ${tr(58, '　　　省间普通中长期（01010403）', V, '千元')}
+    ${tr(59, '　　　省内普通中长期（01010201+203+105）', V, '千元')}
+    ${tr(60, '　　Imbalance 偏差考核', V, '千元')}
+    ${tr(61, '　Spot Trade 现货交易', V, '千元')}
+    ${tr(62, '　　省间现货（010201）', V, '千元')}
+    ${tr(63, '　　省内现货 ⟵变形（010202 − Spot×CfD）', V, '千元')}
+    ${tr(64, 'Trading Fee 交易费用', V, '千元')}
+    ${tr(65, '　Special Fees 其他费用/补偿（03）', V, '千元')}
+    ${tr(66, '　Spot Mkt Trading Fee 现货运营费（0202）', V, '千元')}
+    ${tr(67, '　Ancillary+Grid 辅助服务+两个细则（0206+0103）', V, '千元')}
+  </table></div>
+
+  <div class="sec-header">📈 汇总</div>
+  <div class="table-wrap"><table>${thead()}
+    ${tr(69, 'Total Revenue Before Fee 扣费前总收入', V, '千元')}
+    ${tr(70, 'Total Revenue 总收入（含交易费）', V, '千元')}
+    ${tr(74, 'Net Realized Price Before Fee 扣费前度电收入', V, '元/kWh')}
+    ${tr(75, 'Net Realized Price 度电总收入', V, '元/kWh')}
+  </table></div>
+
+  <div class="summary-grid">
+    <div class="summary-box">
+      <div class="s-label">CfD Settlement</div>
+      <div class="s-val">${fmt(V.r50.val,2)} 千元</div>
+      <div class="s-sub">Spot Price × ${cfdVol} + ${cfdAdj}</div>
+    </div>
+    <div class="summary-box">
+      <div class="s-label">Power Trade 市场化交易</div>
+      <div class="s-val">${fmt(V.r51.val,2)} 千元</div>
+      <div class="s-sub">中长期 + 现货</div>
+    </div>
+    <div class="summary-box highlight">
+      <div class="s-label">扣费前总收入</div>
+      <div class="s-val">${fmt(V.r69.val,2)} 千元</div>
+      <div class="s-sub">度电 ${fmt(V.r74.val,6)} 元/kWh</div>
+    </div>
+    <div class="summary-box highlight">
+      <div class="s-label">总收入（含交易费）</div>
+      <div class="s-val">${fmt(V.r70.val,2)} 千元</div>
+      <div class="s-sub">度电 ${fmt(V.r75.val,6)} 元/kWh</div>
+    </div>
+  </div>
+
+  <button class="btn btn-green" style="margin-top:1rem" onclick='downloadExcel(${JSON.stringify(
+    Object.fromEntries(Object.entries(V).map(([k,vv])=>[k,vv.val]))
+  )}, "${period||""}")'>⬇️ 下载复盘 Excel（风正计算模版_变形_${period||'YYYYMM'}.xlsx）</button>
+  `;
+}
+
+// ---- Excel Download ----
+function downloadExcel(vals, period){
+  const mm=(period||'').slice(4,6);
+  const c=6+parseInt(mm||'1',10);
+  const L=String.fromCharCode(64+c);
+  const wb=XLSX.utils.book_new();
+  const aoa=[];
+  for(let i=0;i<80;i++) aoa.push(new Array(20).fill(null));
+
+  aoa[1][2]='Actual';
+  ['变形逻辑','202601','202602','202603','202604','202605','202606','202607','202608','202609','202610','202611','202612'].forEach((h,i)=>aoa[3][6+i]=h);
+
+  const lbs=[
+    [8,'机制电量+机制调平电费','CfD Volume 机制电量','MWh'],
+    [9,'9=22-8','Power Trade 市场化交易','MWh'],
+    [10,'10=11+15+18','Mid-Long Term 中长期交易','MWh'],
+    [11,'11=12+13','Green Power 绿电交易','MWh'],
+    [12,'12','Interprovincial Green Power 省间绿电','MWh'],
+    [13,'13','Innerprovinicial Green Power 省内绿电','MWh'],
+    [14,'对照绿电环境溢价结算电量','Green Power EA 绿电环境溢价','MWh'],
+    [15,'15=16+17+18','Brown Power 普通中长期','MWh'],
+    [16,'16','Interprovincial Brown Power 省间普通中长期','MWh'],
+    [17,'17','Innerprovinicial Brown Power 省内普通中长期','MWh'],
+    [18,'18','Imbalance (+/-) 偏差考核','MWh'],
+    [19,'19=20+21','Spot Trade 现货交易','MWh'],
+    [20,'20','Interprovincial Spot Trade 省间现货','MWh'],
+    [21,'21','Innerprovincial Spot Trade 省内现货','MWh'],
+    [22,'实际上网电量','Total Generation','MWh'],
+    [27,'机制电价','CfD Price','RMB/KWh'],
+    [28,'市场同类实时均价','Market Average Spot Price','RMB/KWh'],
+    [29,'场站实时体质电价','Spot Price','RMB/KWh'],
+    [50,'CfD Settlement','CfD Settlement',"RMB'000"],
+    [51,'51=52+61','Power Trade 市场化交易',"RMB'000"],
+    [52,'52=53+57+60','Mid-Long Term 中长期交易',"RMB'000"],
+    [53,'53=54+55+56','Green Power 绿电交易',"RMB'000"],
+    [54,'54','Interprovincial Green Power 省间绿电',"RMB'000"],
+    [55,'55','Innerprovinicial Green Power 省内绿电',"RMB'000"],
+    [56,'56','Green Power EA 绿电环境溢价',"RMB'000"],
+    [57,'57=58+59','Brown Power 普通中长期',"RMB'000"],
+    [58,'58','Interprovincial Brown Power 省间普通中长期',"RMB'000"],
+    [59,'59','Innerprovinicial Brown Power 省内普通中长期',"RMB'000"],
+    [60,'60','Imbalance (+/-) 偏差考核',"RMB'000"],
+    [61,'61=62+63','Spot Trade 现货交易',"RMB'000"],
+    [62,'62','Interprovincial Spot Trade 省间现货',"RMB'000"],
+    [63,'差量结算省内现货','Innerprovincial Spot Trade 省内现货',"RMB'000"],
+    [64,'64=65+66+67','Trading Fee 交易费用和补偿',"RMB'000"],
+    [65,'65','Special Fees/Compensation 其他费用/补偿',"RMB'000"],
+    [66,'66','Spot Market Trading Fee 现货市场运营费用',"RMB'000"],
+    [67,'67','Anciliary Service+Grid Charges 辅助服务+两个细则',"RMB'000"],
+    [69,'69=50+51','Total Revenue Before Trading Fee 扣费前总收入',"RMB'000"],
+    [70,'70=50+51+64','Total Revenue 总收入',"RMB'000"],
+    [74,null,'Net Realized Price Before Trading Fee 扣费前度电总收入','RMB/KWh'],
+    [75,null,'Net Realized Price 度电总收入','RMB/KWh'],
+  ];
+  lbs.forEach(([r,b,d,e])=>{if(b)aoa[r][1]=b;if(d)aoa[r][3]=d;if(e)aoa[r][4]=e});
+
+  for(let ci=8;ci<=19;ci++){
+    const X=String.fromCharCode(64+ci);
+    aoa[27][ci]=0.3644;
+    aoa[9][ci]={f:`${X}22-${X}8`};
+    aoa[10][ci]={f:`${X}11+${X}15+${X}18`};
+    aoa[11][ci]={f:`${X}12+${X}13`};
+    aoa[15][ci]={f:`${X}16+${X}17+${X}18`};
+    aoa[19][ci]={f:`${X}20+${X}21`};
+    aoa[26][ci]={f:`IFERROR(${X}50/${X}8,0)`};
+    aoa[51][ci]={f:`${X}52+${X}61`};
+    aoa[52][ci]={f:`${X}53+${X}57+${X}60`};
+    aoa[53][ci]={f:`${X}54+${X}55+${X}56`};
+    aoa[57][ci]={f:`${X}58+${X}59`};
+    aoa[61][ci]={f:`${X}62+${X}63`};
+    aoa[64][ci]={f:`${X}65+${X}66+${X}67`};
+    aoa[69][ci]={f:`${X}50+${X}51`};
+    aoa[70][ci]={f:`${X}50+${X}51+${X}64`};
+    aoa[74][ci]={f:`IFERROR(${X}69/${X}22,0)`};
+    aoa[75][ci]={f:`IFERROR(${X}70/${X}22,0)`};
+  }
+
+  const ci=c-1;
+  const rmap={8:'r8',12:'r12',13:'r13',14:'r14',16:'r16',17:'r17',18:'r18',
+    20:'r20',21:'r21',22:'r22',28:'r28',29:'r29',30:'r30',50:'r50',
+    54:'r54',55:'r55',56:'r56',58:'r58',59:'r59',60:'r60',
+    62:'r62',63:'r63',65:'r65',66:'r66',67:'r67'};
+  Object.entries(rmap).forEach(([row,key])=>{
+    if(vals[key]!==undefined) aoa[parseInt(row)][ci]=Math.round(vals[key]*1e6)/1e6;
+  });
+
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  XLSX.utils.book_append_sheet(wb,ws,'Sheet1');
+  XLSX.writeFile(wb,`风正计算模版_变形_${period}.xlsx`);
+}
+</script>
+</body>
+</html>
